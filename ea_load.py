@@ -5,6 +5,7 @@ import re
 from collections import defaultdict
 import csv
 from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.preprocessing.label import LabelBinarizer
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -88,17 +89,6 @@ def load(path, output_dir, options):
     if options['HUB'] != 1:
         drop_appl(df_app, 'HUB')
 
-    if options['OU'] == 1:
-        filename = 'app_ou_c.csv'
-        print('Loading filename = {}'.format(path + '/' + filename))
-        with open(path + '/' + filename) as csv_file:
-            df = pd.read_csv(csv_file)
-            df['Count'] = 1
-            df_tmp = df.pivot_table(columns='Responsible', values='Count', fill_value=0)
-            for colname in df_tmp.columns:
-                df_tmp.rename({colname: colname + '_OU'}, axis=1, inplace=True)
-            df_app = df_app.join(df_tmp, how='left').fillna(0)
-
     if options['CAPA'] == 1:
         filename = 'app_capa.csv'
         print('Loading filename = {}'.format(path + '/' + filename))
@@ -110,21 +100,50 @@ def load(path, output_dir, options):
                 df_tmp.rename({colname: colname + '_CAPA'}, axis=1, inplace=True)
             df_app = df_app.join(df_tmp, how='left').fillna(0)
 
+    if options['OU'] == 1:
+        filename = 'app_ou_c.csv'
+        print('Loading filename = {}'.format(path + '/' + filename))
+        with open(path + '/' + filename) as csv_file:
+            lb = LabelBinarizer()
+            df = pd.read_csv(csv_file)
+            df = df.set_index('Application')
+            df_tmp = lb.fit_transform(df['Responsible'])
+            if len(lb.classes_) > 2:
+                df_tmp = pd.DataFrame(df_tmp, columns=lb.classes_, index=df.index)
+            else:
+                df_tmp = pd.DataFrame(df_tmp, columns='OU', index=df.index)
+            df_app = df_app.join(df_tmp, how='left').fillna(0)
+
     if options['PLATF'] == 1:
         filename = 'app_platf_c.csv'
         print('Loading filename = {}'.format(path + '/' + filename))
         with open(path + '/' + filename) as csv_file:
+            lb = LabelBinarizer()
             df = pd.read_csv(csv_file)
-            df['Count'] = 1
-            df_tmp = df.pivot_table(index='Application', columns='Platform', values='Count', fill_value=0)
+            df = df.set_index('Application')
+            df_tmp = lb.fit_transform(df['Platform'])
+            if len(lb.classes_) > 2:
+                df_tmp = pd.DataFrame(df_tmp, columns=lb.classes_, index=df.index)
+            else:
+                df_tmp = pd.DataFrame(df_tmp, columns=['PLATFORM'], index=df.index)
             df_app = df_app.join(df_tmp, how='left').fillna(0)
 
     if options['CLASS'] != '':
-        df_app_details.loc[df_app_details.Product == options['CLASS'], 'TARGET_CLASS'] = 1
-        df_app_details.loc[df_app_details.Product != options['CLASS'], 'TARGET_CLASS'] = 0
-        df_tmp2 = pd.DataFrame()
-        df_tmp2['CLASS'] = df_app_details['TARGET_CLASS']
-        df_app = df_app.join(df_tmp2, how='left').fillna(0)
+        lb = LabelBinarizer()
+        df_tmp = lb.fit_transform(df_app_details['Product'])
+        if len(lb.classes_) > 2:
+            df_tmp2 = pd.DataFrame(df_tmp, columns=lb.classes_, index=df_app_details.index)
+            df_tmp2 = df_tmp2[[options['CLASS']]]
+            df_tmp2 = df_tmp2.rename(columns={options['CLASS']:'CLASS'})
+            df_app = df_app.join(df_tmp2, how='left').fillna(0)
+        else:
+            df_tmp2 = pd.DataFrame(df_tmp, columns=['CLASS'], index=df_app_details.index)
+            class_idx = -1
+            for idx, label in enumerate(lb.classes_):
+                if label == options['CLASS']:
+                    class_idx = idx
+            df_tmp2 = (df_tmp2[['CLASS']] == class_idx).astype(int)
+            df_app = df_app.join(df_tmp2, how='left').fillna(0)
 
     df_app = df_app.join(df_app_details['ANNOTATE'], how='left').fillna(0)
 

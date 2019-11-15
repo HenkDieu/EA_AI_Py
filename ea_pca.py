@@ -22,7 +22,7 @@ def reduce_pca(df_app, output_dir, options):
     if options['CLASS'] != '':
         df_app_tmp.drop('CLASS', axis=1, inplace=True)
 
-    scaler_list = (StandardScaler(), RobustScaler(), QuantileTransformer(), Normalizer())
+    scaler_list = (StandardScaler(), RobustScaler(), QuantileTransformer(output_distribution='normal'), Normalizer())
     scaler_svd_format = {'StandardScaler': 'r--', 'RobustScaler': 'b--', 'QuantileTransformer': 'g--', 'Normalizer': 'k--'}
     pca = PCA()
 

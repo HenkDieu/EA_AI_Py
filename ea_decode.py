@@ -3,7 +3,10 @@ import re
 
 def decode_options(options):
 
-    dscp = '{}'.format('HUB') if options['HUB'] == 1 else 'No {}'.format('HUB')
+    dscp = 'Landscapes: '
+    for l in options['landscapes']:
+        dscp += (l + ' - ')
+    dscp += ' {}'.format('HUB') if options['HUB'] == 1 else 'No {}'.format('HUB')
     dscp += ' - {}'.format('Capabilities') if options['CAPA'] == 1 else ''
     dscp += ' - {}'.format('OU') if options['OU'] == 1 else ''
     dscp += ' - {}'.format('Platform') if options['PLATF'] == 1 else ''
