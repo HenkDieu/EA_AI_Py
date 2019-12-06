@@ -10,10 +10,17 @@ from sklearn.preprocessing import Normalizer
 from sklearn.decomposition import TruncatedSVD
 from sklearn.decomposition import PCA
 #from sklearn.cluster import KMeans
+from sklearn.ensemble import ExtraTreesClassifier
+from sklearn.feature_selection import SelectKBest
+from sklearn.feature_selection import chi2
+from sklearn.feature_selection import RFE
+from sklearn.linear_model import LogisticRegression
+
+from operator import itemgetter
 
 import ea_decode
 
-def reduce_pca(df_app, output_dir, options):
+def reduce_pca(df_app, output_dir, options, Kfeatures=5):
 
     options_dscp = ea_decode.decode_options(options)
 
@@ -22,9 +29,20 @@ def reduce_pca(df_app, output_dir, options):
     if options['CLASS'] != '':
         df_app_tmp.drop('CLASS', axis=1, inplace=True)
 
+    # Univariate Feature Selection
+    X = df_app_tmp
+    Y = df_app['CLASS']
+
+    univar_select = SelectKBest(score_func=chi2, k=Kfeatures)
+    univar_select.fit(X, Y)
+    # summarize scores
+    sorted_idx, sorted_val = zip(*sorted([(i, e) for i, e in enumerate(univar_select.scores_)], key=itemgetter(1), reverse=True))
+    print('Univariate feature selection')
+    for idx, valn in zip(sorted_idx, sorted_val):
+        print('\tFeature {}: {}'.format(df_app_tmp.columns.values[idx], valn))
+
     scaler_list = (StandardScaler(), RobustScaler(), QuantileTransformer(output_distribution='normal'), Normalizer())
     scaler_svd_format = {'StandardScaler': 'r--', 'RobustScaler': 'b--', 'QuantileTransformer': 'g--', 'Normalizer': 'k--'}
-    pca = PCA()
 
     proj_error_dict = dict()
 
@@ -35,6 +53,30 @@ def reduce_pca(df_app, output_dir, options):
 
         df_app_tmp2 = scaler.fit_transform(df_app_tmp)
 
+        X = df_app_tmp2
+        Y = df_app['CLASS']
+
+        # ExtraTrees Feature Selection
+        extra_select = ExtraTreesClassifier(n_estimators=Kfeatures)
+        extra_select.fit(X, Y)
+        print('ExtraTrees Feature Classification')
+        sorted_idx, sorted_val = zip(*sorted([(i, e) for i, e in enumerate(extra_select.feature_importances_)], key=itemgetter(1), reverse=True))
+        for idx, valn in zip(sorted_idx, sorted_val):
+            print('\tFeature {}: {}'.format(df_app_tmp.columns.values[idx], valn))
+
+        # Recursive Feature Extraction
+        lr_select = LogisticRegression(solver='lbfgs')
+        rfe = RFE(lr_select, Kfeatures)
+        rfe.fit(X, Y)
+        print("Num Features: %d" % rfe.n_features_)
+        for i in [i for i, x in enumerate(rfe.support_) if x]:
+            print("\tFeature: %s" % df_app_tmp.columns.values[i])
+        sorted_idx, sorted_val = zip(*sorted([(i, e) for i, e in enumerate(rfe.ranking_)], key=itemgetter(1)))
+        for idx, valn in zip(sorted_idx, sorted_val):
+            print("\tFeature %s: ranking %d" % (df_app_tmp.columns.values[idx], valn))
+
+        # Principal Component Analysis
+        pca = PCA()
         ea_new = pca.fit_transform(df_app_tmp2)
         #print('{}\n\n'.format(pca.explained_variance_ratio_))
 
@@ -71,29 +113,6 @@ def reduce_pca(df_app, output_dir, options):
             plt.savefig(os.path.join(output_dir, file_out))
             plt.close()
 
-        if 0:
-            # K-Means on first 2 dimensions
-            dim_range = (0, 1)
-            nbr_clusters = 5
-            kmeans = KMeans(n_clusters=nbr_clusters).fit(ea_new[:,dim_range])
-
-            # Plot
-            plt.figure()  # size in inches
-            cmap = plt.get_cmap('Set1')
-            plt.scatter(x, y, s=area, c=np.array(cmap.colors)[kmeans.labels_], alpha=0.5)
-            plt.title(ea_decode.options_title(options) + '\n' + scaler_text + 'KMeans {} clusters'.format(nbr_clusters))
-            plt.xlabel('x')
-            plt.ylabel('y')
-
-            for x_coord, y_coord, annotation, cluster in zip(x, y, df_app['ANNOTATE'], kmeans.labels_):
-                plt.annotate(annotation, xy=(x_coord, y_coord), c=np.array(cmap.colors)[cluster])
-
-            if output_dir == '':
-                plt.show()
-            else:
-                file_out = ea_decode.options_filename(options) + '_' + 'KMeans_{}'.format(nbr_clusters)
-                plt.savefig(os.path.join(output_dir, file_out))
-                plt.close()
 
     file_out = ea_decode.options_filename(options) + '_projerror'
     plt.figure()  # size in inches

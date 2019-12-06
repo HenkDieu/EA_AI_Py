@@ -8,6 +8,7 @@ import ea_classify
 import ea_lda
 import ea_cluster
 import ea_decode
+import ea_bn
 
 if __name__ == '__main__':
 
@@ -21,7 +22,7 @@ if __name__ == '__main__':
         'OU': 1,
         'CAPA': 1,
         'PLATF': 1,
-        'CLASS': 'Asset Servicing'}
+        'CLASS': 'Settlement'}
 
     logging.basicConfig(filename=output_dir + '/' + 'ea_main.log',
                         level=logging.INFO,
@@ -34,9 +35,8 @@ if __name__ == '__main__':
     ea_lda.fit_ea_lda(df_app, output_dir, options)
     ea_pca.reduce_pca(df_app, output_dir, options)
     ea_cluster.do_clustering(df_app, output_dir, options)
+    ea_bn.build_bn(df_app, output_dir, options)
 
     if options['CLASS'] != '':
         ea_classify.classify(df_app, output_dir, options)
         foo=1
-
-    foo=1

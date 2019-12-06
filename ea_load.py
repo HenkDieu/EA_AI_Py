@@ -84,10 +84,10 @@ def load(path, output_dir, options):
         df_app = df_app.join(df_app2, how='left', rsuffix='_OUT').fillna(0)
 
     # Merge HUB and CreationDirect
-    merge_appl(df_app, 'HUB', 'CreationDirect')
-
-    if options['HUB'] != 1:
-        drop_appl(df_app, 'HUB')
+    if 'CBL' in options['landscapes']:
+        merge_appl(df_app, 'HUB', 'CreationDirect')
+        if options['HUB'] != 1:
+            drop_appl(df_app, 'HUB')
 
     if options['CAPA'] == 1:
         filename = 'app_capa.csv'

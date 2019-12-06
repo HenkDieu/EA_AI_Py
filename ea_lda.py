@@ -31,7 +31,6 @@ def makeImage(text_dict, output_dir, filename):
     # show
     plt.imshow(wc, interpolation="bilinear")
     plt.axis("off")
-    plt.show()
 
     if output_dir == '':
         plt.show()
